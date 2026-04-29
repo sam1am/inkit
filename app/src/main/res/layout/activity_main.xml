@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <!-- Top toolbar -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnPrev"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_prev"
+            android:contentDescription="Previous canvas" />
+
+        <TextView
+            android:id="@+id/txtPage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="60dp"
+            android:gravity="center"
+            android:text="0/0"
+            android:textSize="14sp"
+            android:textColor="#000000" />
+
+        <ImageButton
+            android:id="@+id/btnNext"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_next"
+            android:contentDescription="Next canvas" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/btnPen"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_pen"
+            android:contentDescription="Pen" />
+
+        <ImageButton
+            android:id="@+id/btnEraser"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_eraser"
+            android:contentDescription="Eraser" />
+
+        <ImageButton
+            android:id="@+id/btnColor"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_color"
+            android:contentDescription="Color" />
+
+        <ImageButton
+            android:id="@+id/btnFinger"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_finger"
+            android:contentDescription="Toggle finger draw" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/btnClear"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_clear"
+            android:contentDescription="Clear canvas" />
+
+        <ImageButton
+            android:id="@+id/btnNew"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_new"
+            android:contentDescription="New canvas" />
+
+        <ImageButton
+            android:id="@+id/btnDelete"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_delete"
+            android:contentDescription="Delete canvas" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/topBarDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#000000"
+        app:layout_constraintTop_toBottomOf="@id/topBar" />
+
+    <com.example.inktouchdemo.InkSurfaceView
+        android:id="@+id/inkSurface"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/topBarDivider"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Scroll position indicator (right edge of canvas) -->
+    <View
+        android:id="@+id/scrollIndicator"
+        android:layout_width="3dp"
+        android:layout_height="40dp"
+        android:background="#000000"
+        android:visibility="invisible"
+        app:layout_constraintTop_toBottomOf="@id/topBarDivider"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Color palette popup -->
+    <LinearLayout
+        android:id="@+id/colorPalette"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:padding="6dp"
+        android:elevation="4dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/topBarDivider"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
