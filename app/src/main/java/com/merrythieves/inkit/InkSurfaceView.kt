@@ -449,29 +449,33 @@ class InkSurfaceView @JvmOverloads constructor(
     private fun drawBackgroundPatternOnCanvas(canvas: Canvas) {
         val lineSpacing = 90f
         val dotSpacing = 90f
-        val marginTop = 150f
+        val ruledMarginTop = 150f
         when (backgroundType) {
-            1 -> drawRuledLinesOnCanvas(canvas, lineSpacing, marginTop)
+            1 -> drawRuledLinesOnCanvas(canvas, lineSpacing, ruledMarginTop)
             2 -> drawDotGridOnCanvas(canvas, dotSpacing)
-            3 -> drawGridOnCanvas(canvas, dotSpacing, marginTop)
+            3 -> drawGridOnCanvas(canvas, dotSpacing)
         }
     }
 
     private fun drawRuledLinesOnCanvas(canvas: Canvas, lineSpacing: Float, marginTop: Float) {
         val docHeight = docBitmap?.height ?: return
+        val offsetY = -scrollY.toFloat()
 
-        // Draw margin line (red-ish line on the left)
+        // Draw margin line (red-ish line on the left) — spans the full visible window
         val marginPaint = Paint().apply {
             color = Color.parseColor("#C86060") // Red for margin
             strokeWidth = 1.5f
             style = Paint.Style.STROKE
         }
-        canvas.drawLine(60f, 0f, 60f, docHeight.toFloat(), marginPaint)
+        canvas.drawLine(60f, 0f, 60f, height.toFloat(), marginPaint)
 
-        // Draw horizontal ruled lines
+        // Draw horizontal ruled lines in document space, translated by scroll
         var y = marginTop
         while (y < docHeight) {
-            canvas.drawLine(0f, y, width.toFloat(), y, backgroundPaint)
+            val drawY = y + offsetY
+            if (drawY >= 0f && drawY <= height.toFloat()) {
+                canvas.drawLine(0f, drawY, width.toFloat(), drawY, backgroundPaint)
+            }
             y += lineSpacing
         }
     }
@@ -479,32 +483,40 @@ class InkSurfaceView @JvmOverloads constructor(
     private fun drawDotGridOnCanvas(canvas: Canvas, spacing: Float) {
         val docHeight = docBitmap?.height ?: return
         val dotRadius = 3f
+        val offsetY = -scrollY.toFloat()
 
         var x = spacing / 4
         while (x <= width) {
             var y = spacing
             while (y < docHeight) {
-                canvas.drawCircle(x, y, dotRadius, dotPaint)
+                val drawY = y + offsetY
+                if (drawY >= -dotRadius && drawY <= height.toFloat() + dotRadius) {
+                    canvas.drawCircle(x, drawY, dotRadius, dotPaint)
+                }
                 y += spacing
             }
             x += spacing
         }
     }
 
-    private fun drawGridOnCanvas(canvas: Canvas, spacing: Float, marginTop: Float) {
+    private fun drawGridOnCanvas(canvas: Canvas, spacing: Float) {
         val docHeight = docBitmap?.height ?: return
+        val offsetY = -scrollY.toFloat()
 
-        // Draw horizontal lines
-        var y = marginTop
+        // Horizontal lines — start at `spacing` so the first row matches the rest
+        var y = spacing
         while (y < docHeight) {
-            canvas.drawLine(0f, y, width.toFloat(), y, backgroundPaint)
+            val drawY = y + offsetY
+            if (drawY >= 0f && drawY <= height.toFloat()) {
+                canvas.drawLine(0f, drawY, width.toFloat(), drawY, backgroundPaint)
+            }
             y += spacing
         }
 
-        // Draw vertical lines
+        // Vertical lines — full visible window height (don't scroll horizontally)
         var x = spacing / 4
         while (x <= width) {
-            canvas.drawLine(x, 0f, x, docHeight.toFloat(), backgroundPaint)
+            canvas.drawLine(x, 0f, x, height.toFloat(), backgroundPaint)
             x += spacing
         }
     }
