@@ -64,8 +64,8 @@ class InkSurfaceView @JvmOverloads constructor(
 
     /** Paint for drawing background patterns */
     private val backgroundPaint = Paint().apply {
-        color = Color.parseColor("#D0D8E8") // Faint blue
-        strokeWidth = 1f
+        color = Color.parseColor("#7090B8") // Same blue as dots
+        strokeWidth = 1.5f
         style = Paint.Style.STROKE
     }
 
@@ -178,24 +178,15 @@ class InkSurfaceView @JvmOverloads constructor(
         scrollListener?.invoke(scrollY, maxScrollY())
     }
 
-    /** Set document with saved content and background type. */
+    /** Set document with saved content (ink-only, transparent background) and background type. */
     fun setDocBitmapWithContent(content: Bitmap, bgType: Int, scrollYReset: Int = 0) {
         docBitmap?.recycle()
-        val w = content.width
-        val h = content.height
-        val fresh = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(fresh)
-        // Draw background first
-        canvas.drawColor(Color.WHITE)
-        if (bgType > 0) {
-            backgroundType = bgType
-            drawBackgroundPatternOnCanvas(canvas)
-        } else {
-            backgroundType = 0
-        }
-        // Draw saved content on top
-        canvas.drawBitmap(content, 0f, 0f, null)
+        // docBitmap holds ink strokes on a TRANSPARENT background.
+        // Background patterns are composited in rebuildWindowFromDoc, not baked here.
+        val fresh = Bitmap.createBitmap(content.width, content.height, Bitmap.Config.ARGB_8888)
+        Canvas(fresh).drawBitmap(content, 0f, 0f, null)
         content.recycle()
+        backgroundType = bgType
         docBitmap = fresh
         scrollY = scrollYReset.coerceIn(0, maxScrollY())
         ensureWindowBitmap()
@@ -209,39 +200,11 @@ class InkSurfaceView @JvmOverloads constructor(
      *  0 = none, 1 = ruled (horizontal lines), 2 = dot grid, 3 = grid */
     fun setBackground(type: Int) {
         if (type == backgroundType) return
-
-        val oldDoc = docBitmap?.let { bmp ->
-            // Copy existing content (strokes) before redrawing background
-            val copy = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
-            Canvas(copy).drawBitmap(bmp, 0f, 0f, null)
-            copy
-        }
-
         backgroundType = type
-        // Redraw background on document
-        redrawBackgroundOnDocument()
-
-        // Restore existing content on top of new background
-        oldDoc?.let { strokes ->
-            val doc = docBitmap ?: return@let
-            Canvas(doc).drawBitmap(strokes, 0f, 0f, null)
-            strokes.recycle()
-        }
-
+        // Background is rendered in rebuildWindowFromDoc, not baked into docBitmap
         rebuildWindowFromDoc()
         commitWindowToSurface()
         windowBitmap?.let { ink.syncOverlay(it, force = true) }
-    }
-
-    private fun redrawBackgroundOnDocument() {
-        val doc = docBitmap ?: return
-        val canvas = Canvas(doc)
-        canvas.drawColor(Color.WHITE)
-
-        if (backgroundType > 0) {
-            // Draw background pattern on document
-            drawBackgroundPatternOnCanvas(canvas)
-        }
     }
 
     /** Detach the doc bitmap from the view (caller takes ownership). */
@@ -283,12 +246,8 @@ class InkSurfaceView @JvmOverloads constructor(
 
     fun clearCurrent() {
         val doc = docBitmap ?: return
-        val canvas = Canvas(doc)
-        canvas.drawColor(Color.WHITE)
-        // Redraw background if set
-        if (backgroundType > 0) {
-            drawBackgroundPatternOnCanvas(canvas)
-        }
+        // Clear to transparent so background pattern shows through
+        Canvas(doc).drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
         rebuildWindowFromDoc()
         commitWindowToSurface()
         windowBitmap?.let { ink.syncOverlay(it, force = true) }
@@ -455,15 +414,10 @@ class InkSurfaceView @JvmOverloads constructor(
         val target = h * documentHeightFactor
         val current = docBitmap
         if (current != null && current.width == w && current.height == target) return
+        // Transparent background — ink strokes only; background rendered in rebuildWindowFromDoc
         val fresh = Bitmap.createBitmap(w, target, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(fresh)
-        canvas.drawColor(Color.WHITE)
-        // Draw background pattern if set
-        if (backgroundType > 0) {
-            drawBackgroundPatternOnCanvas(canvas)
-        }
         if (current != null) {
-            canvas.drawBitmap(current, 0f, 0f, null)
+            Canvas(fresh).drawBitmap(current, 0f, 0f, null)
             current.recycle()
         }
         docBitmap = fresh
@@ -484,17 +438,18 @@ class InkSurfaceView @JvmOverloads constructor(
         val window = windowBitmap ?: return
         val doc = docBitmap ?: return
         val canvas = Canvas(window)
+        // 1. White base
         canvas.drawColor(Color.WHITE)
-
-        // Draw the document (with background already baked in) offset by scroll
+        // 2. Background pattern on top of white
+        if (backgroundType > 0) drawBackgroundPatternOnCanvas(canvas)
+        // 3. Ink strokes (transparent-background docBitmap) composited over pattern
         canvas.drawBitmap(doc, 0f, -scrollY.toFloat(), null)
     }
 
     private fun drawBackgroundPatternOnCanvas(canvas: Canvas) {
-        val lineSpacing = 90f // Spacing between horizontal lines
-        val dotSpacing = 90f  // Spacing for dot/grid patterns
-        val marginTop = 150f   // Top margin for ruled lines
-
+        val lineSpacing = 90f
+        val dotSpacing = 90f
+        val marginTop = 150f
         when (backgroundType) {
             1 -> drawRuledLinesOnCanvas(canvas, lineSpacing, marginTop)
             2 -> drawDotGridOnCanvas(canvas, dotSpacing)
@@ -525,8 +480,8 @@ class InkSurfaceView @JvmOverloads constructor(
         val docHeight = docBitmap?.height ?: return
         val dotRadius = 3f
 
-        var x = spacing
-        while (x < width) {
+        var x = spacing / 4
+        while (x <= width) {
             var y = spacing
             while (y < docHeight) {
                 canvas.drawCircle(x, y, dotRadius, dotPaint)
@@ -547,8 +502,8 @@ class InkSurfaceView @JvmOverloads constructor(
         }
 
         // Draw vertical lines
-        var x = spacing
-        while (x < width) {
+        var x = spacing / 4
+        while (x <= width) {
             canvas.drawLine(x, 0f, x, docHeight.toFloat(), backgroundPaint)
             x += spacing
         }

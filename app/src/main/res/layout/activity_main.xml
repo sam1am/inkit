@@ -32,10 +32,11 @@
             android:id="@+id/txtPage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="60dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="4dp"
             android:gravity="center"
             android:text="0/0"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textColor="#000000" />
 
         <ImageButton
@@ -97,14 +98,6 @@
             android:layout_weight="1" />
 
         <ImageButton
-            android:id="@+id/btnClear"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_clear"
-            android:contentDescription="Clear canvas" />
-
-        <ImageButton
             android:id="@+id/btnNew"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="40dp"
@@ -113,12 +106,12 @@
             android:contentDescription="New canvas" />
 
         <ImageButton
-            android:id="@+id/btnDelete"
+            android:id="@+id/btnMore"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@drawable/ic_delete"
-            android:contentDescription="Delete canvas" />
+            android:src="@drawable/ic_more"
+            android:contentDescription="More options" />
     </LinearLayout>
 
     <View

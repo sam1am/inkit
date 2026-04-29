@@ -136,12 +136,12 @@ class CanvasStore(context: Context) {
         }
     }
 
-    /** Load saved strokes/content for a canvas, composited onto a blank canvas. */
+    /** Load saved strokes/content for a canvas onto a transparent bitmap (ink only, no background). */
     fun loadContent(index: Int, width: Int, height: Int): Bitmap {
         val meta = items[index]
         val file = File(dir, "${meta.id}.png")
+        // Transparent base — background pattern is rendered separately by InkSurfaceView
         val blank = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        Canvas(blank).drawColor(Color.WHITE)
         if (file.exists()) {
             val decoded = BitmapFactory.decodeFile(file.absolutePath)
             if (decoded != null) {

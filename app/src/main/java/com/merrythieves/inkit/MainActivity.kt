@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.View
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.inksdk.ink.InkDefaults
@@ -26,9 +27,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnEraser: ImageButton
     private lateinit var btnColor: ImageButton
     private lateinit var btnFinger: ImageButton
-    private lateinit var btnClear: ImageButton
     private lateinit var btnNew: ImageButton
-    private lateinit var btnDelete: ImageButton
+    private lateinit var btnMore: ImageButton
     private lateinit var btnBackground: ImageButton
     private lateinit var palette: LinearLayout
     private lateinit var scrollIndicator: View
@@ -79,9 +79,8 @@ class MainActivity : AppCompatActivity() {
         btnEraser = findViewById(R.id.btnEraser)
         btnColor = findViewById(R.id.btnColor)
         btnFinger = findViewById(R.id.btnFinger)
-        btnClear = findViewById(R.id.btnClear)
         btnNew = findViewById(R.id.btnNew)
-        btnDelete = findViewById(R.id.btnDelete)
+        btnMore = findViewById(R.id.btnMore)
         btnBackground = findViewById(R.id.btnBackground)
         palette = findViewById(R.id.colorPalette)
         scrollIndicator = findViewById(R.id.scrollIndicator)
@@ -98,13 +97,12 @@ class MainActivity : AppCompatActivity() {
             ink.touchEnabled = !ink.touchEnabled
             updateToolHighlights()
         }
-        btnClear.setOnClickListener { confirmClear() }
+        btnMore.setOnClickListener { showMoreMenu() }
         btnNew.setOnClickListener {
             cancelSaveAndFlush()
             store.createNew(setCurrent = true, inheritBackgroundType = currentBackgroundIndex)
             loadCurrentIntoView()
         }
-        btnDelete.setOnClickListener { confirmDelete() }
         btnBackground.setOnClickListener { showBackgroundPicker() }
 
         ink.setPageNavListener { dir ->
@@ -173,6 +171,20 @@ class MainActivity : AppCompatActivity() {
         updateToolHighlights()
         updatePageLabel()
         updateScrollIndicator(0, ink.maxScrollY())
+    }
+
+    private fun showMoreMenu() {
+        val popup = PopupMenu(this, btnMore)
+        popup.menu.add(0, 1, 0, "Clear canvas")
+        popup.menu.add(0, 2, 1, "Delete canvas")
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> confirmClear()
+                2 -> confirmDelete()
+            }
+            true
+        }
+        popup.show()
     }
 
     private fun confirmClear() {
@@ -249,8 +261,7 @@ class MainActivity : AppCompatActivity() {
         btnFinger.background = if (ink.touchEnabled) getDrawable(R.drawable.bg_tool_selected) else null
         // Use the color icon's tint as a hint of the active color.
         btnColor.imageTintList = android.content.res.ColorStateList.valueOf(activeColor)
-        // Highlight background button when not on first option
-        btnBackground.background = if (currentBackgroundIndex > 0) getDrawable(R.drawable.bg_tool_selected) else null
+        btnBackground.background = null
     }
 
     private fun showBackgroundPicker() {
