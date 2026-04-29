@@ -462,8 +462,8 @@ class InkSurfaceView @JvmOverloads constructor(
 
         // Draw margin line (red-ish line on the left)
         val marginPaint = Paint().apply {
-            color = Color.parseColor("#FFAAAA") // Faint red for margin
-            strokeWidth = 1f
+            color = Color.parseColor("#C86060") // Red for margin
+            strokeWidth = 1.5f
             style = Paint.Style.STROKE
         }
         canvas.drawLine(60f, 0f, 60f, docHeight.toFloat(), marginPaint)
