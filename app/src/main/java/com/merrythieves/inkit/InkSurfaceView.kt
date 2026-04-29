@@ -90,6 +90,16 @@ class InkSurfaceView @JvmOverloads constructor(
         isAntiAlias = false
     }
 
+    /** Paint for eraser strokes — uses PorterDuff.Mode.CLEAR to remove ink, not cover it. */
+    private val eraserPaint = Paint().apply {
+        color = Color.BLACK // Required but ignored for clear mode
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        isAntiAlias = false
+        xfermode = android.graphics.BlendMode.CLEAR
+    }
+
     // Daemon stroke buffer (view-local coords from the InputListener).
     private val strokeBuffer = mutableListOf<PointF>()
 
@@ -234,9 +244,9 @@ class InkSurfaceView @JvmOverloads constructor(
 
     private fun applyStrokeStyle() {
         if (isEraser) {
-            strokePaint.color = Color.WHITE
-            strokePaint.strokeWidth = eraserWidth
-            ink.setStrokeStyle(eraserWidth, Color.WHITE)
+            eraserPaint.strokeWidth = eraserWidth
+            strokePaint.color = strokeColor // keep strokePaint valid for mode checks
+            ink.setStrokeStyle(eraserWidth, Color.WHITE) // daemon may still expect white
         } else {
             strokePaint.color = strokeColor
             strokePaint.strokeWidth = strokeWidth
@@ -350,7 +360,8 @@ class InkSurfaceView @JvmOverloads constructor(
         val ay = fingerLastY + scrollY
         val bx = event.x
         val by = event.y + scrollY
-        canvas.drawLine(ax, ay, bx, by, strokePaint)
+        val paint = if (isEraser) eraserPaint else strokePaint
+        canvas.drawLine(ax, ay, bx, by, paint)
         rebuildWindowFromDoc()
         commitWindowToSurface()
         windowBitmap?.let { ink.syncOverlay(it, force = false) }
@@ -358,6 +369,7 @@ class InkSurfaceView @JvmOverloads constructor(
 
     private fun handleFallbackPen(event: MotionEvent): Boolean {
         val doc = docBitmap ?: return false
+        val paint = if (isEraser) eraserPaint else strokePaint
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 fallbackPenDown = true
@@ -370,11 +382,11 @@ class InkSurfaceView @JvmOverloads constructor(
                 for (i in 0 until event.historySize) {
                     val hx = event.getHistoricalX(i)
                     val hy = event.getHistoricalY(i) + scrollY
-                    canvas.drawLine(fallbackPenLastX, fallbackPenLastY, hx, hy, strokePaint)
+                    canvas.drawLine(fallbackPenLastX, fallbackPenLastY, hx, hy, paint)
                     fallbackPenLastX = hx; fallbackPenLastY = hy
                 }
                 val ex = event.x; val ey = event.y + scrollY
-                canvas.drawLine(fallbackPenLastX, fallbackPenLastY, ex, ey, strokePaint)
+                canvas.drawLine(fallbackPenLastX, fallbackPenLastY, ex, ey, paint)
                 fallbackPenLastX = ex; fallbackPenLastY = ey
                 rebuildWindowFromDoc()
                 commitWindowToSurface()
@@ -394,10 +406,11 @@ class InkSurfaceView @JvmOverloads constructor(
         val doc = docBitmap ?: return
         if (strokeBuffer.size < 2) return
         val canvas = Canvas(doc)
+        val paint = if (isEraser) eraserPaint else strokePaint
         for (i in 1 until strokeBuffer.size) {
             val a = strokeBuffer[i - 1]
             val b = strokeBuffer[i]
-            canvas.drawLine(a.x, a.y + scrollY, b.x, b.y + scrollY, strokePaint)
+            canvas.drawLine(a.x, a.y + scrollY, b.x, b.y + scrollY, paint)
         }
         rebuildWindowFromDoc()
     }
