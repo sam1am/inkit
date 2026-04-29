@@ -56,7 +56,7 @@ class InkSurfaceView @JvmOverloads constructor(
     var isEraser: Boolean = false
         private set
 
-    /** When false, finger drawing is suppressed. Pen and finger nav still work. */
+    /** When false, all finger input is disabled (no drawing, no scrolling, no swiping). */
     var touchEnabled: Boolean = false
 
     private var navListener: PageNavListener? = null
@@ -239,6 +239,8 @@ class InkSurfaceView @JvmOverloads constructor(
     }
 
     private fun handleFingerEvent(event: MotionEvent): Boolean {
+        // When touch is disabled, reject all finger input (no drawing, no scrolling)
+        if (!touchEnabled) return false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 fingerActive = true
@@ -256,7 +258,7 @@ class InkSurfaceView @JvmOverloads constructor(
                         fingerMode = when {
                             kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.5f -> FingerMode.SWIPE
                             kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f -> FingerMode.SCROLL
-                            else -> if (touchEnabled) FingerMode.DRAW else FingerMode.SCROLL
+                            else -> FingerMode.DRAW
                         }
                     } else return true
                 }
@@ -267,7 +269,7 @@ class InkSurfaceView @JvmOverloads constructor(
                     }
                     FingerMode.SWIPE -> Unit
                     FingerMode.DRAW -> {
-                        if (touchEnabled) drawFingerSegment(event)
+                        drawFingerSegment(event)
                     }
                     FingerMode.UNDECIDED -> Unit
                 }
