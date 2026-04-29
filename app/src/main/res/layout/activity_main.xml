@@ -120,7 +120,7 @@
         android:background="#000000"
         app:layout_constraintTop_toBottomOf="@id/topBar" />
 
-    <com.example.inktouchdemo.InkSurfaceView
+    <com.merrythieves.inkit.InkSurfaceView
         android:id="@+id/inkSurface"
         android:layout_width="0dp"
         android:layout_height="0dp"

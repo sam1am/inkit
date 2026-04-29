@@ -1,11 +1,11 @@
-package com.example.inktouchdemo
+package com.merrythieves.inkit
 
 import android.app.Application
 import android.os.Build
 import android.util.Log
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 
-class InkTouchApp : Application() {
+class InkitApp : Application() {
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -17,5 +17,5 @@ class InkTouchApp : Application() {
             }
         }
     }
-    companion object { private const val TAG = "InkTouchApp" }
+    companion object { private const val TAG = "InkitApp" }
 }

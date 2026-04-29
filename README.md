@@ -1,13 +1,25 @@
-# InkTouch Demo
+# inkit
 
-A simple Android app demonstrating the [inksdk](https://github.com/imedwei/inksdk) library for low-latency stylus input on e-ink devices (Bigme, Onyx Boox).
+A simple, fast note-taking app for Android with an eye toward bullet journaling. inkit is designed to be used with [Bigme](https://bigme.vn/) e-ink devices and built on top of [inksdk](https://github.com/imedwei/inksdk) for low-latency stylus input.
+
+Special thanks to [imedwei/inksdk](https://github.com/imedwei/inksdk) for the underlying low-latency ink library that makes this possible.
+
+## Philosophy
+
+inkit aims to stay out of your way:
+
+- **Simple** — pen, eraser, page nav. Nothing else to learn.
+- **Fast** — low-latency stylus input via inksdk's vendor-specific ink controllers.
+- **Bullet-journal friendly** — quick page creation and navigation for daily logs, collections, and rapid logging.
+- **E-ink first** — designed and tuned for Bigme devices, with fallback support for other Android tablets.
 
 ## Features
 
-- **Pen/Finger Differentiation**: Uses `MotionEvent.getToolType()` to distinguish between stylus and finger input
-- **Toggle Finger Touch**: Enable/disable finger drawing while pen input remains active
-- **Low-latency ink**: Leverages the vendor-specific ink controllers for pen input
-- **Touch-through buttons**: Control buttons remain tappable even when finger touch is disabled on the canvas
+- **Pen / finger differentiation** — uses `MotionEvent.getToolType()` to distinguish stylus from finger.
+- **Toggle finger touch** — disable finger drawing while pen input remains active, so you can rest your hand on the screen.
+- **Low-latency ink** — leverages vendor-specific ink controllers for pen input.
+- **Touch-through buttons** — control buttons remain tappable even when finger touch is disabled on the canvas.
+- **Multi-page canvas** — flip between pages for journaling-style workflows.
 
 ## Building
 
@@ -20,14 +32,11 @@ A simple Android app demonstrating the [inksdk](https://github.com/imedwei/inksd
 ### Setup
 
 ```bash
-# Clone the repo
 git clone <repo-url>
 cd inkit
 
-# Set Android SDK path (adjust to your setup)
 export ANDROID_HOME=/path/to/android-sdk
 
-# Build debug APK
 ./gradlew assembleDebug
 ```
 
@@ -35,23 +44,24 @@ The APK will be at: `app/build/outputs/apk/debug/app-debug.apk`
 
 ## Usage
 
-1. **Draw with finger** - works when touch is enabled
-2. **Draw with stylus** - always works (pen input bypasses finger touch toggle)
-3. **Toggle button** - enables/disables finger touch on canvas
-4. **Clear button** - wipes the canvas
-5. Status indicator shows current touch/pen state
+1. **Draw with stylus** — always works (pen input bypasses the finger touch toggle).
+2. **Draw with finger** — works when touch is enabled.
+3. **Toggle button** — enables/disables finger touch on the canvas.
+4. **Pen / eraser / clear** — switch tools or wipe the current page.
+5. **Prev / next / new** — navigate or add pages.
 
 ## Project Structure
 
 ```
 app/
-├── src/main/java/com/example/inktouchdemo/
-│   ├── MainActivity.kt      # Activity with toggle and clear controls
-│   └── InkSurfaceView.kt    # Custom SurfaceView with pen/finger differentiation
+├── src/main/java/com/merrythieves/inkit/
+│   ├── MainActivity.kt      # Activity with toolbar and page controls
+│   ├── InkSurfaceView.kt    # Custom SurfaceView with pen/finger differentiation
+│   ├── CanvasStore.kt       # Page persistence
+│   └── InkitApp.kt          # Application class
 ├── src/main/res/layout/activity_main.xml
 └── build.gradle.kts
-inksdk/                       # Embedded inksdk library
-├── build.gradle.kts
+inksdk/                       # Embedded inksdk library (https://github.com/imedwei/inksdk)
 └── src/main/java/com/inksdk/ink/
     ├── InkController.kt     # Interface for ink controllers
     ├── BigmeInkController.kt
@@ -64,33 +74,35 @@ inksdk/                       # Embedded inksdk library
 ### Input Differentiation
 
 ```kotlin
-// Check if input is from a stylus/pen
 private fun isPenInput(event: MotionEvent): Boolean {
     val toolType = event.getToolType(0)
-    return toolType == MotionEvent.TOOL_TYPE_STYLUS || 
+    return toolType == MotionEvent.TOOL_TYPE_STYLUS ||
            toolType == MotionEvent.TOOL_TYPE_ERASER
 }
 
-// Check if input is from a finger
 private fun isFingerInput(event: MotionEvent): Boolean {
     val toolType = event.getToolType(0)
-    return toolType == MotionEvent.TOOL_TYPE_FINGER || 
+    return toolType == MotionEvent.TOOL_TYPE_FINGER ||
            toolType == MotionEvent.TOOL_TYPE_MOUSE
 }
 ```
 
 ### Touch Event Handling
 
-1. **Pen input**: Always handled (bypasses touchEnabled flag)
-2. **Finger input**: Only handled if `touchEnabled = true`
-3. When finger touch is disabled, `onTouchEvent` returns `false`, allowing events to bubble up to parent views (buttons can still be clicked)
+1. **Pen input** — always handled (bypasses the touchEnabled flag).
+2. **Finger input** — only handled if `touchEnabled = true`.
+3. When finger touch is disabled, `onTouchEvent` returns `false`, allowing events to bubble up to parent views (buttons can still be clicked).
 
 ## Architecture Notes
 
-- Uses `InkController` interface for vendor abstraction
-- Supports Bigme (via `HandwrittenClient`), Onyx (via `TouchHelper`), and fallback (standard `MotionEvent` path)
-- Ink is mirrored to a bitmap for compatibility with system UI composes
-- Onyx `TouchHelper` owns the surface during raw drawing; Bigme paints to a separate ION buffer
+- Uses the `InkController` interface for vendor abstraction.
+- Supports Bigme (via `HandwrittenClient`), Onyx (via `TouchHelper`), and a fallback (standard `MotionEvent` path).
+- Ink is mirrored to a bitmap for compatibility with system UI composes.
+- Onyx `TouchHelper` owns the surface during raw drawing; Bigme paints to a separate ION buffer.
+
+## Acknowledgements
+
+Huge thanks to [@imedwei](https://github.com/imedwei) and the [inksdk](https://github.com/imedwei/inksdk) project — inkit would not exist without it.
 
 ## License
 

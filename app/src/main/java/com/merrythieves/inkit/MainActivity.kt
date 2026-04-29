@@ -1,4 +1,4 @@
-package com.example.inktouchdemo
+package com.merrythieves.inkit
 
 import android.app.AlertDialog
 import android.graphics.Bitmap

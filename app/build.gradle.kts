@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.inktouchdemo"
+    namespace = "com.merrythieves.inkit"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.inktouchdemo"
+        applicationId = "com.merrythieves.inkit"
         minSdk = 26
         targetSdk = 34
     }

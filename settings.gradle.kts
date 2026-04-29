@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "InkTouchDemo"
+rootProject.name = "inkit"
 include(":app")
 include(":inksdk")
 project(":inksdk").projectDir = file("inksdk")
