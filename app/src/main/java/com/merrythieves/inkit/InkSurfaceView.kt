@@ -178,6 +178,33 @@ class InkSurfaceView @JvmOverloads constructor(
         scrollListener?.invoke(scrollY, maxScrollY())
     }
 
+    /** Set document with saved content and background type. */
+    fun setDocBitmapWithContent(content: Bitmap, bgType: Int, scrollYReset: Int = 0) {
+        docBitmap?.recycle()
+        val w = content.width
+        val h = content.height
+        val fresh = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(fresh)
+        // Draw background first
+        canvas.drawColor(Color.WHITE)
+        if (bgType > 0) {
+            backgroundType = bgType
+            drawBackgroundPatternOnCanvas(canvas)
+        } else {
+            backgroundType = 0
+        }
+        // Draw saved content on top
+        canvas.drawBitmap(content, 0f, 0f, null)
+        content.recycle()
+        docBitmap = fresh
+        scrollY = scrollYReset.coerceIn(0, maxScrollY())
+        ensureWindowBitmap()
+        rebuildWindowFromDoc()
+        commitWindowToSurface()
+        windowBitmap?.let { ink.syncOverlay(it, force = true) }
+        scrollListener?.invoke(scrollY, maxScrollY())
+    }
+
     /** Set the background pattern type.
      *  0 = none, 1 = ruled (horizontal lines), 2 = dot grid, 3 = grid */
     fun setBackground(type: Int) {

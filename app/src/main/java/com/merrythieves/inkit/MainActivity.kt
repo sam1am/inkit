@@ -165,11 +165,11 @@ class MainActivity : AppCompatActivity() {
         val h = ink.height
         if (w <= 0 || h <= 0) return
         val docHeight = h * ink.documentHeightFactor
-        val bmp = store.loadBitmap(store.getCurrentIndex(), w, docHeight)
-        ink.setDocBitmap(bmp, scrollYReset = 0)
-        // Load this page's background setting
+        // Load this page's background setting first
         currentBackgroundIndex = store.getBackgroundType(store.getCurrentIndex())
-        ink.setBackground(currentBackgroundIndex)
+        // Load saved content
+        val content = store.loadContent(store.getCurrentIndex(), w, docHeight)
+        ink.setDocBitmapWithContent(content, currentBackgroundIndex, scrollYReset = 0)
         updateToolHighlights()
         updatePageLabel()
         updateScrollIndicator(0, ink.maxScrollY())

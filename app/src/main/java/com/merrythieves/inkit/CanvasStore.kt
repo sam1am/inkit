@@ -130,27 +130,26 @@ class CanvasStore(context: Context) {
     }
 
     fun loadBitmap(index: Int, width: Int, height: Int): Bitmap {
-        val meta = items[index]
-        val file = File(dir, "${meta.id}.png")
-        if (file.exists()) {
-            val decoded = BitmapFactory.decodeFile(file.absolutePath)
-            if (decoded != null) {
-                if (decoded.width == width && decoded.height == height && decoded.config == Bitmap.Config.ARGB_8888) {
-                    return decoded.copy(Bitmap.Config.ARGB_8888, true)
-                }
-                // Fit decoded into a fresh bitmap of the requested size.
-                val target = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                Canvas(target).apply {
-                    drawColor(Color.WHITE)
-                    drawBitmap(decoded, 0f, 0f, null)
-                }
-                decoded.recycle()
-                return target
-            }
-        }
+        // Always return a blank white canvas - background is drawn by InkSurfaceView
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
             Canvas(this).drawColor(Color.WHITE)
         }
+    }
+
+    /** Load saved strokes/content for a canvas, composited onto a blank canvas. */
+    fun loadContent(index: Int, width: Int, height: Int): Bitmap {
+        val meta = items[index]
+        val file = File(dir, "${meta.id}.png")
+        val blank = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        Canvas(blank).drawColor(Color.WHITE)
+        if (file.exists()) {
+            val decoded = BitmapFactory.decodeFile(file.absolutePath)
+            if (decoded != null) {
+                Canvas(blank).drawBitmap(decoded, 0f, 0f, null)
+                decoded.recycle()
+            }
+        }
+        return blank
     }
 
     fun saveBitmap(index: Int, bitmap: Bitmap) {
