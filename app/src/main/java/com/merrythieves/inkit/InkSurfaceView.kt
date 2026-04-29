@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.PointF
 import android.graphics.Rect
 import android.util.AttributeSet
@@ -97,7 +99,7 @@ class InkSurfaceView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         isAntiAlias = false
-        xfermode = android.graphics.BlendMode.CLEAR
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
     }
 
     // Daemon stroke buffer (view-local coords from the InputListener).
