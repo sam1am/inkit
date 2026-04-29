@@ -1,0 +1,101 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Get current version
+        id: version
+        run: |
+          # Get the current version from gradle.properties
+          if grep -q "^VERSION_NAME=" gradle.properties; then
+            CURRENT_VERSION=$(grep "^VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          else
+            CURRENT_VERSION="1.0.0"
+          fi
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Increment version
+        id: increment_version
+        run: |
+          CURRENT=${{ steps.version.outputs.current_version }}
+          
+          # Split version into parts
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+          
+          MAJOR="${VERSION_PARTS[0]:-1}"
+          MINOR="${VERSION_PARTS[1]:-0}"
+          PATCH="${VERSION_PARTS[2]:-0}"
+          
+          # Increment patch version
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Update gradle.properties
+          if grep -q "^VERSION_NAME=" gradle.properties; then
+            sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$NEW_VERSION/" gradle.properties
+          else
+            echo "VERSION_NAME=$NEW_VERSION" >> gradle.properties
+          fi
+          
+          echo "Version incremented: $CURRENT -> $NEW_VERSION"
+
+      - name: Update app versionCode and versionName
+        run: |
+          CURRENT=${{ steps.increment_version.outputs.new_version }}
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+          MAJOR="${VERSION_PARTS[0]:-1}"
+          MINOR="${VERSION_PARTS[1]:-0}"
+          PATCH="${VERSION_PARTS[2]:-0}"
+          
+          # versionCode = MAJOR * 10000 + MINOR * 100 + PATCH
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          
+          # Update versionCode and versionName in app/build.gradle.kts
+          sed -i "s/versionCode[[:space:]]*=.*/versionCode = $VERSION_CODE/" app/build.gradle.kts
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"$CURRENT\"/" app/build.gradle.kts
+          
+          echo "Version code: $VERSION_CODE"
+          echo "Version name: $CURRENT"
+
+      - name: Build debug APK
+        run: |
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-${{ steps.increment_version.outputs.new_version }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Commit version bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions"
+          git add gradle.properties app/build.gradle.kts
+          git diff --cached --quiet || git commit -m "chore: bump version to ${{ steps.increment_version.outputs.new_version }}"
+          git push
