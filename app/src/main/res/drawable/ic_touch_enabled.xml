@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Hand/touch icon -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,2C9.79,2 8,3.79 8,6v6H6v6c0,1.1 0.9,2 2,2h1v2c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-2h2v2c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-2h1c1.1,0 2,-0.9 2,-2v-6h-2V6c0,-2.21 -1.79,-4 -4,-4z"/>
+</vector>

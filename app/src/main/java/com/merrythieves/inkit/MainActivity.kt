@@ -35,7 +35,22 @@ class MainActivity : AppCompatActivity() {
 
     private var currentBackgroundIndex = 0
 
-    private val colors = intArrayOf(Color.BLACK, Color.RED, Color.BLUE, parseColor("#1E7B1E"))
+    // Rainbow + greys
+    private val colors = intArrayOf(
+        Color.BLACK,
+        Color.parseColor("#404040"), // Dark grey
+        Color.parseColor("#808080"), // Medium grey
+        Color.parseColor("#C0C0C0"), // Light grey
+        Color.RED,
+        Color.parseColor("#FF6600"), // Orange
+        Color.parseColor("#FFCC00"), // Yellow
+        Color.parseColor("#00CC00"), // Green
+        Color.parseColor("#00CCCC"), // Cyan
+        Color.BLUE,
+        Color.parseColor("#6600CC"), // Purple
+        Color.parseColor("#CC00CC"), // Magenta
+        Color.parseColor("#1E7B1E")  // Dark green
+    )
     private var activeColor: Int = Color.BLACK
 
     /** Idle period after the last stroke before we encode + write the PNG.
@@ -75,7 +90,7 @@ class MainActivity : AppCompatActivity() {
         ink.setStrokeStyle(InkDefaults.DEFAULT_STROKE_WIDTH_PX, activeColor)
 
         btnPrev.setOnClickListener { goToPage(store.getCurrentIndex() - 1) }
-        btnNext.setOnClickListener { goToPage(store.getCurrentIndex() + 1) }
+        btnNext.setOnClickListener { goToPageOrCreateNew() }
         btnPen.setOnClickListener { selectPen() }
         btnEraser.setOnClickListener { selectEraser() }
         btnColor.setOnClickListener { togglePalette() }
@@ -86,13 +101,21 @@ class MainActivity : AppCompatActivity() {
         btnClear.setOnClickListener { confirmClear() }
         btnNew.setOnClickListener {
             cancelSaveAndFlush()
-            store.createNew(setCurrent = true)
+            store.createNew(setCurrent = true, inheritBackgroundType = currentBackgroundIndex)
             loadCurrentIntoView()
         }
         btnDelete.setOnClickListener { confirmDelete() }
         btnBackground.setOnClickListener { showBackgroundPicker() }
 
-        ink.setPageNavListener { dir -> goToPage(store.getCurrentIndex() + dir) }
+        ink.setPageNavListener { dir ->
+            val nextIdx = store.getCurrentIndex() + dir
+            if (nextIdx < store.size) {
+                goToPage(nextIdx)
+            } else if (dir > 0) {
+                // Swipe forward on last page creates new page
+                btnNew.performClick()
+            }
+        }
         ink.setScrollListener { y, max -> updateScrollIndicator(y, max) }
         ink.setDirtyListener { schedulePersist() }
 
@@ -118,8 +141,23 @@ class MainActivity : AppCompatActivity() {
     private fun goToPage(index: Int) {
         if (index < 0 || index >= store.size) return
         cancelSaveAndFlush()
+        // Save current page's background setting before leaving
+        store.setBackgroundType(store.getCurrentIndex(), currentBackgroundIndex)
         store.setCurrent(index)
         loadCurrentIntoView()
+    }
+
+    private fun goToPageOrCreateNew() {
+        val nextIdx = store.getCurrentIndex() + 1
+        if (nextIdx < store.size) {
+            goToPage(nextIdx)
+        } else {
+            // On last page, create new page
+            cancelSaveAndFlush()
+            store.setBackgroundType(store.getCurrentIndex(), currentBackgroundIndex)
+            store.createNew(setCurrent = true, inheritBackgroundType = currentBackgroundIndex)
+            loadCurrentIntoView()
+        }
     }
 
     private fun loadCurrentIntoView() {
@@ -129,6 +167,10 @@ class MainActivity : AppCompatActivity() {
         val docHeight = h * ink.documentHeightFactor
         val bmp = store.loadBitmap(store.getCurrentIndex(), w, docHeight)
         ink.setDocBitmap(bmp, scrollYReset = 0)
+        // Load this page's background setting
+        currentBackgroundIndex = store.getBackgroundType(store.getCurrentIndex())
+        ink.setBackground(currentBackgroundIndex)
+        updateToolHighlights()
         updatePageLabel()
         updateScrollIndicator(0, ink.maxScrollY())
     }
@@ -203,7 +245,7 @@ class MainActivity : AppCompatActivity() {
         val penActive = !ink.isEraser
         btnPen.background = if (penActive) getDrawable(R.drawable.bg_tool_selected) else null
         btnEraser.background = if (!penActive) getDrawable(R.drawable.bg_tool_selected) else null
-        btnFinger.setImageResource(if (ink.touchEnabled) R.drawable.ic_finger else R.drawable.ic_finger_off)
+        btnFinger.setImageResource(if (ink.touchEnabled) R.drawable.ic_touch_enabled else R.drawable.ic_touch_disabled)
         btnFinger.background = if (ink.touchEnabled) getDrawable(R.drawable.bg_tool_selected) else null
         // Use the color icon's tint as a hint of the active color.
         btnColor.imageTintList = android.content.res.ColorStateList.valueOf(activeColor)
@@ -217,6 +259,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Background")
             .setSingleChoiceItems(options, currentBackgroundIndex) { dialog, which ->
                 currentBackgroundIndex = which
+                store.setBackgroundType(store.getCurrentIndex(), which)
                 ink.setBackground(which)
                 updateToolHighlights()
                 dialog.dismiss()
@@ -229,7 +272,8 @@ class MainActivity : AppCompatActivity() {
         val current = if (total > 0) store.getCurrentIndex() + 1 else 0
         txtPage.text = "$current/$total"
         btnPrev.isEnabled = store.getCurrentIndex() > 0
-        btnNext.isEnabled = store.getCurrentIndex() < store.size - 1
+        // Next button always enabled (creates new page if on last)
+        btnNext.isEnabled = true
     }
 
     private fun updateScrollIndicator(scrollY: Int, maxScrollY: Int) {

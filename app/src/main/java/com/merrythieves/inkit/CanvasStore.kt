@@ -21,7 +21,7 @@ import java.util.UUID
  */
 class CanvasStore(context: Context) {
 
-    data class CanvasMeta(val id: String, val createdAt: Long)
+    data class CanvasMeta(val id: String, val createdAt: Long, val backgroundType: Int = 0)
 
     private val dir: File = File(context.filesDir, "canvases").apply { mkdirs() }
     private val indexFile: File = File(dir, "index.json")
@@ -49,6 +49,7 @@ class CanvasStore(context: Context) {
                 items += CanvasMeta(
                     id = o.getString("id"),
                     createdAt = o.getLong("createdAt"),
+                    backgroundType = o.optInt("backgroundType", 0),
                 )
             }
             currentIndex = obj.optInt("currentIndex", items.lastIndex.coerceAtLeast(0))
@@ -65,6 +66,7 @@ class CanvasStore(context: Context) {
             arr.put(JSONObject().apply {
                 put("id", m.id)
                 put("createdAt", m.createdAt)
+                put("backgroundType", m.backgroundType)
             })
         }
         val obj = JSONObject().apply {
@@ -89,13 +91,27 @@ class CanvasStore(context: Context) {
     }
 
     /** Add a new blank canvas at the end. Returns the new index. */
-    fun createNew(setCurrent: Boolean = true): Int {
-        val meta = CanvasMeta(id = UUID.randomUUID().toString(), createdAt = System.currentTimeMillis())
+    fun createNew(setCurrent: Boolean = true, inheritBackgroundType: Int = 0): Int {
+        val meta = CanvasMeta(
+            id = UUID.randomUUID().toString(),
+            createdAt = System.currentTimeMillis(),
+            backgroundType = inheritBackgroundType
+        )
         items.add(meta)
         val newIndex = items.lastIndex
         if (setCurrent) currentIndex = newIndex
         flushIndex()
         return newIndex
+    }
+
+    fun getBackgroundType(index: Int): Int {
+        return if (index in items.indices) items[index].backgroundType else 0
+    }
+
+    fun setBackgroundType(index: Int, type: Int) {
+        if (index !in items.indices) return
+        items[index] = items[index].copy(backgroundType = type)
+        flushIndex()
     }
 
     /** Delete the canvas at [index]. Returns the new current index, or -1 if no canvases left. */

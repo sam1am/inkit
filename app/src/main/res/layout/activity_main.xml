@@ -80,7 +80,7 @@
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@drawable/ic_background"
+            android:src="@drawable/ic_background_ruled"
             android:contentDescription="Background pattern" />
 
         <ImageButton
@@ -88,7 +88,7 @@
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@drawable/ic_finger"
+            android:src="@drawable/ic_touch_enabled"
             android:contentDescription="Toggle finger draw" />
 
         <View

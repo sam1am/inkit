@@ -181,9 +181,26 @@ class InkSurfaceView @JvmOverloads constructor(
     /** Set the background pattern type.
      *  0 = none, 1 = ruled (horizontal lines), 2 = dot grid, 3 = grid */
     fun setBackground(type: Int) {
+        if (type == backgroundType) return
+
+        val oldDoc = docBitmap?.let { bmp ->
+            // Copy existing content (strokes) before redrawing background
+            val copy = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
+            Canvas(copy).drawBitmap(bmp, 0f, 0f, null)
+            copy
+        }
+
         backgroundType = type
         // Redraw background on document
         redrawBackgroundOnDocument()
+
+        // Restore existing content on top of new background
+        oldDoc?.let { strokes ->
+            val doc = docBitmap ?: return@let
+            Canvas(doc).drawBitmap(strokes, 0f, 0f, null)
+            strokes.recycle()
+        }
+
         rebuildWindowFromDoc()
         commitWindowToSurface()
         windowBitmap?.let { ink.syncOverlay(it, force = true) }
