@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/Inkit Icon 1024.png" alt="inkit logo" width="128">
+</p>
+
 # inkit
 
 A simple, fast note-taking app for Android with an eye toward bullet journaling. inkit is designed to be used with [Bigme](https://bigme.vn/) e-ink devices and built on top of [inksdk](https://github.com/imedwei/inksdk) for low-latency stylus input.
