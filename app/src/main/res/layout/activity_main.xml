@@ -76,6 +76,14 @@
             android:contentDescription="Color" />
 
         <ImageButton
+            android:id="@+id/btnBackground"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_background"
+            android:contentDescription="Background pattern" />
+
+        <ImageButton
             android:id="@+id/btnFinger"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="40dp"

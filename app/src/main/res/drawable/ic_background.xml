@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Grid icon representing background patterns -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M3,3h18v18H3zM3,9h18M3,15h18M9,3v18M15,3v18"
+        android:strokeWidth="1"
+        android:strokeColor="#000000"/>
+</vector>

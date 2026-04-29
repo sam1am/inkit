@@ -29,8 +29,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnClear: ImageButton
     private lateinit var btnNew: ImageButton
     private lateinit var btnDelete: ImageButton
+    private lateinit var btnBackground: ImageButton
     private lateinit var palette: LinearLayout
     private lateinit var scrollIndicator: View
+
+    private var currentBackgroundIndex = 0
 
     private val colors = intArrayOf(Color.BLACK, Color.RED, Color.BLUE, parseColor("#1E7B1E"))
     private var activeColor: Int = Color.BLACK
@@ -64,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         btnClear = findViewById(R.id.btnClear)
         btnNew = findViewById(R.id.btnNew)
         btnDelete = findViewById(R.id.btnDelete)
+        btnBackground = findViewById(R.id.btnBackground)
         palette = findViewById(R.id.colorPalette)
         scrollIndicator = findViewById(R.id.scrollIndicator)
 
@@ -86,6 +90,7 @@ class MainActivity : AppCompatActivity() {
             loadCurrentIntoView()
         }
         btnDelete.setOnClickListener { confirmDelete() }
+        btnBackground.setOnClickListener { showBackgroundPicker() }
 
         ink.setPageNavListener { dir -> goToPage(store.getCurrentIndex() + dir) }
         ink.setScrollListener { y, max -> updateScrollIndicator(y, max) }
@@ -202,6 +207,21 @@ class MainActivity : AppCompatActivity() {
         btnFinger.background = if (ink.touchEnabled) getDrawable(R.drawable.bg_tool_selected) else null
         // Use the color icon's tint as a hint of the active color.
         btnColor.imageTintList = android.content.res.ColorStateList.valueOf(activeColor)
+        // Highlight background button when not on first option
+        btnBackground.background = if (currentBackgroundIndex > 0) getDrawable(R.drawable.bg_tool_selected) else null
+    }
+
+    private fun showBackgroundPicker() {
+        val options = arrayOf("No background", "Horizontal lines (ruled)", "Dot grid", "Grid")
+        AlertDialog.Builder(this)
+            .setTitle("Background")
+            .setSingleChoiceItems(options, currentBackgroundIndex) { dialog, which ->
+                currentBackgroundIndex = which
+                ink.setBackground(which)
+                updateToolHighlights()
+                dialog.dismiss()
+            }
+            .show()
     }
 
     private fun updatePageLabel() {

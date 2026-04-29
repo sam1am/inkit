@@ -59,6 +59,21 @@ class InkSurfaceView @JvmOverloads constructor(
     /** When false, all finger input is disabled (no drawing, no scrolling, no swiping). */
     var touchEnabled: Boolean = false
 
+    /** Background pattern type. 0=none, 1=ruled, 2=dots, 3=grid */
+    private var backgroundType: Int = 0
+
+    /** Paint for drawing background patterns */
+    private val backgroundPaint = Paint().apply {
+        color = Color.parseColor("#D0D8E8") // Faint blue
+        strokeWidth = 1f
+        style = Paint.Style.STROKE
+    }
+
+    private val dotPaint = Paint().apply {
+        color = Color.parseColor("#7090B8") // Darker blue for dots
+        style = Paint.Style.FILL
+    }
+
     private var navListener: PageNavListener? = null
     fun setPageNavListener(l: PageNavListener?) { navListener = l }
     private var scrollListener: ((Int, Int) -> Unit)? = null
@@ -163,6 +178,28 @@ class InkSurfaceView @JvmOverloads constructor(
         scrollListener?.invoke(scrollY, maxScrollY())
     }
 
+    /** Set the background pattern type.
+     *  0 = none, 1 = ruled (horizontal lines), 2 = dot grid, 3 = grid */
+    fun setBackground(type: Int) {
+        backgroundType = type
+        // Redraw background on document
+        redrawBackgroundOnDocument()
+        rebuildWindowFromDoc()
+        commitWindowToSurface()
+        windowBitmap?.let { ink.syncOverlay(it, force = true) }
+    }
+
+    private fun redrawBackgroundOnDocument() {
+        val doc = docBitmap ?: return
+        val canvas = Canvas(doc)
+        canvas.drawColor(Color.WHITE)
+
+        if (backgroundType > 0) {
+            // Draw background pattern on document
+            drawBackgroundPatternOnCanvas(canvas)
+        }
+    }
+
     /** Detach the doc bitmap from the view (caller takes ownership). */
     fun takeDocBitmap(): Bitmap? {
         val b = docBitmap
@@ -202,7 +239,12 @@ class InkSurfaceView @JvmOverloads constructor(
 
     fun clearCurrent() {
         val doc = docBitmap ?: return
-        Canvas(doc).drawColor(Color.WHITE)
+        val canvas = Canvas(doc)
+        canvas.drawColor(Color.WHITE)
+        // Redraw background if set
+        if (backgroundType > 0) {
+            drawBackgroundPatternOnCanvas(canvas)
+        }
         rebuildWindowFromDoc()
         commitWindowToSurface()
         windowBitmap?.let { ink.syncOverlay(it, force = true) }
@@ -370,9 +412,14 @@ class InkSurfaceView @JvmOverloads constructor(
         val current = docBitmap
         if (current != null && current.width == w && current.height == target) return
         val fresh = Bitmap.createBitmap(w, target, Bitmap.Config.ARGB_8888)
-        Canvas(fresh).drawColor(Color.WHITE)
+        val canvas = Canvas(fresh)
+        canvas.drawColor(Color.WHITE)
+        // Draw background pattern if set
+        if (backgroundType > 0) {
+            drawBackgroundPatternOnCanvas(canvas)
+        }
         if (current != null) {
-            Canvas(fresh).drawBitmap(current, 0f, 0f, null)
+            canvas.drawBitmap(current, 0f, 0f, null)
             current.recycle()
         }
         docBitmap = fresh
@@ -394,7 +441,73 @@ class InkSurfaceView @JvmOverloads constructor(
         val doc = docBitmap ?: return
         val canvas = Canvas(window)
         canvas.drawColor(Color.WHITE)
+
+        // Draw the document (with background already baked in) offset by scroll
         canvas.drawBitmap(doc, 0f, -scrollY.toFloat(), null)
+    }
+
+    private fun drawBackgroundPatternOnCanvas(canvas: Canvas) {
+        val lineSpacing = 90f // Spacing between horizontal lines
+        val dotSpacing = 90f  // Spacing for dot/grid patterns
+        val marginTop = 150f   // Top margin for ruled lines
+
+        when (backgroundType) {
+            1 -> drawRuledLinesOnCanvas(canvas, lineSpacing, marginTop)
+            2 -> drawDotGridOnCanvas(canvas, dotSpacing)
+            3 -> drawGridOnCanvas(canvas, dotSpacing, marginTop)
+        }
+    }
+
+    private fun drawRuledLinesOnCanvas(canvas: Canvas, lineSpacing: Float, marginTop: Float) {
+        val docHeight = docBitmap?.height ?: return
+
+        // Draw margin line (red-ish line on the left)
+        val marginPaint = Paint().apply {
+            color = Color.parseColor("#FFAAAA") // Faint red for margin
+            strokeWidth = 1f
+            style = Paint.Style.STROKE
+        }
+        canvas.drawLine(60f, 0f, 60f, docHeight.toFloat(), marginPaint)
+
+        // Draw horizontal ruled lines
+        var y = marginTop
+        while (y < docHeight) {
+            canvas.drawLine(0f, y, width.toFloat(), y, backgroundPaint)
+            y += lineSpacing
+        }
+    }
+
+    private fun drawDotGridOnCanvas(canvas: Canvas, spacing: Float) {
+        val docHeight = docBitmap?.height ?: return
+        val dotRadius = 3f
+
+        var x = spacing
+        while (x < width) {
+            var y = spacing
+            while (y < docHeight) {
+                canvas.drawCircle(x, y, dotRadius, dotPaint)
+                y += spacing
+            }
+            x += spacing
+        }
+    }
+
+    private fun drawGridOnCanvas(canvas: Canvas, spacing: Float, marginTop: Float) {
+        val docHeight = docBitmap?.height ?: return
+
+        // Draw horizontal lines
+        var y = marginTop
+        while (y < docHeight) {
+            canvas.drawLine(0f, y, width.toFloat(), y, backgroundPaint)
+            y += spacing
+        }
+
+        // Draw vertical lines
+        var x = spacing
+        while (x < width) {
+            canvas.drawLine(x, 0f, x, docHeight.toFloat(), backgroundPaint)
+            x += spacing
+        }
     }
 
     private fun commitWindowToSurface() {
