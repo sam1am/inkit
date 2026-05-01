@@ -63,6 +63,12 @@ class MainActivity : AppCompatActivity() {
      *  good on-disk state. */
     private var contentLoaded: Boolean = false
 
+    /** Nesting count of UI surfaces (popup menus, dialogs, palette) currently
+     *  occluding the canvas. The daemon dispatches pen events based on view
+     *  bounds, not Z-order, so without disabling its input these surfaces
+     *  would let pen taps draw on the canvas underneath. */
+    private var penDisableCount: Int = 0
+
     /** Single-threaded background pool for canvas saves. Min priority so the
      *  compress pass can't compete with the daemon's binder thread. */
     private val saveExecutor = Executors.newSingleThreadExecutor { r ->
@@ -199,10 +205,13 @@ class MainActivity : AppCompatActivity() {
             }
             true
         }
+        popup.setOnDismissListener { popPenDisable() }
+        pushPenDisable()
         popup.show()
     }
 
     private fun confirmClear() {
+        pushPenDisable()
         AlertDialog.Builder(this)
             .setTitle("Clear canvas")
             .setMessage("Erase all ink on this canvas? This can't be undone.")
@@ -210,11 +219,14 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Clear") { _, _ ->
                 ink.clearCurrent()
                 cancelSaveAndFlush()
-            }.show()
+            }
+            .setOnDismissListener { popPenDisable() }
+            .show()
     }
 
     private fun confirmDelete() {
         if (store.size == 0) return
+        pushPenDisable()
         AlertDialog.Builder(this)
             .setTitle("Delete canvas")
             .setMessage("Delete this canvas? This can't be undone.")
@@ -230,7 +242,9 @@ class MainActivity : AppCompatActivity() {
                     store.createNew(setCurrent = true, inheritBackgroundType = currentBackgroundIndex)
                 }
                 loadCurrentIntoView()
-            }.show()
+            }
+            .setOnDismissListener { popPenDisable() }
+            .show()
     }
 
     private fun selectPen() {
@@ -244,7 +258,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun togglePalette() {
-        palette.visibility = if (palette.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        setPaletteVisible(palette.visibility != View.VISIBLE)
+    }
+
+    private fun setPaletteVisible(visible: Boolean) {
+        val wasVisible = palette.visibility == View.VISIBLE
+        if (visible == wasVisible) return
+        palette.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible) pushPenDisable() else popPenDisable()
     }
 
     private fun buildPalette() {
@@ -264,7 +285,7 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     activeColor = c
                     ink.setStrokeStyle(InkDefaults.DEFAULT_STROKE_WIDTH_PX, activeColor)
-                    palette.visibility = View.GONE
+                    setPaletteVisible(false)
                     updateToolHighlights()
                 }
             }
@@ -285,6 +306,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showBackgroundPicker() {
         val options = arrayOf("No background", "Horizontal lines (ruled)", "Dot grid", "Grid")
+        pushPenDisable()
         AlertDialog.Builder(this)
             .setTitle("Background")
             .setSingleChoiceItems(options, currentBackgroundIndex) { dialog, which ->
@@ -294,6 +316,7 @@ class MainActivity : AppCompatActivity() {
                 updateToolHighlights()
                 dialog.dismiss()
             }
+            .setOnDismissListener { popPenDisable() }
             .show()
     }
 
@@ -316,6 +339,16 @@ class MainActivity : AppCompatActivity() {
         val frac = scrollY.toFloat() / maxScrollY.toFloat()
         val travel = (viewHeight - scrollIndicator.height).coerceAtLeast(0)
         scrollIndicator.translationY = (frac * travel)
+    }
+
+    private fun pushPenDisable() {
+        if (penDisableCount == 0) ink.setOverlayEnabled(false)
+        penDisableCount++
+    }
+
+    private fun popPenDisable() {
+        penDisableCount = (penDisableCount - 1).coerceAtLeast(0)
+        if (penDisableCount == 0) ink.setOverlayEnabled(true)
     }
 
     /** Reset the idle timer. Fired by InkSurfaceView every time a stroke ends. */
