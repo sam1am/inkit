@@ -82,6 +82,8 @@ class InkSurfaceView @JvmOverloads constructor(
     fun setScrollListener(l: ((scrollY: Int, maxScrollY: Int) -> Unit)?) { scrollListener = l }
     private var dirtyListener: (() -> Unit)? = null
     fun setDirtyListener(l: (() -> Unit)?) { dirtyListener = l }
+    private var surfaceReadyListener: (() -> Unit)? = null
+    fun setSurfaceReadyListener(l: (() -> Unit)?) { surfaceReadyListener = l }
 
     private val strokePaint = Paint().apply {
         color = strokeColor
@@ -161,20 +163,23 @@ class InkSurfaceView @JvmOverloads constructor(
                 Log.i(TAG, "Ink controller did not attach — using fallback")
             }
         }
+        surfaceReadyListener?.invoke()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
         ensureBitmaps()
         commitWindowToSurface()
+        surfaceReadyListener?.invoke()
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
         ink.detach()
-        windowBitmap?.recycle()
-        windowBitmap = null
-        docBitmap?.recycle()
-        docBitmap = null
+        // docBitmap / windowBitmap are intentionally retained: they are off-
+        // screen buffers, independent of the surface, and recycling them on
+        // every surface destroy would discard the user's note when the surface
+        // is destroyed-and-recreated (e.g. brief backgrounding) without a
+        // matching reload from disk.
     }
 
     /** Switch the underlying document to [bmp]. Caller owns lifecycle of any

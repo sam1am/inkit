@@ -57,6 +57,12 @@ class MainActivity : AppCompatActivity() {
      *  Keeps disk I/O off the path of active writing. */
     private val saveIdleDelayMs = 2_500L
 
+    /** True once the current canvas's saved content has been loaded into the
+     *  view. Save attempts before this flag is set would persist a transient
+     *  blank docBitmap (e.g. one created by a surface recreate) over the
+     *  good on-disk state. */
+    private var contentLoaded: Boolean = false
+
     /** Single-threaded background pool for canvas saves. Min priority so the
      *  compress pass can't compete with the daemon's binder thread. */
     private val saveExecutor = Executors.newSingleThreadExecutor { r ->
@@ -116,6 +122,13 @@ class MainActivity : AppCompatActivity() {
         }
         ink.setScrollListener { y, max -> updateScrollIndicator(y, max) }
         ink.setDirtyListener { schedulePersist() }
+        // If the surface is destroyed and recreated (e.g. brief backgrounding,
+        // config change), reload from disk in case the in-memory bitmap was
+        // lost. With InkSurfaceView's bitmaps now retained across the surface
+        // lifecycle this is mostly a safety net for process-death restoration.
+        ink.setSurfaceReadyListener {
+            if (!contentLoaded) loadCurrentIntoView()
+        }
 
         buildPalette()
         updateToolHighlights()
@@ -162,6 +175,7 @@ class MainActivity : AppCompatActivity() {
         val w = ink.width
         val h = ink.height
         if (w <= 0 || h <= 0) return
+        contentLoaded = false
         val docHeight = h * ink.documentHeightFactor
         // Load this page's background setting first
         currentBackgroundIndex = store.getBackgroundType(store.getCurrentIndex())
@@ -171,6 +185,7 @@ class MainActivity : AppCompatActivity() {
         updateToolHighlights()
         updatePageLabel()
         updateScrollIndicator(0, ink.maxScrollY())
+        contentLoaded = true
     }
 
     private fun showMoreMenu() {
@@ -315,6 +330,10 @@ class MainActivity : AppCompatActivity() {
     /** Snapshot the doc bitmap on the main thread (cheap memcpy), hand the
      *  copy to the worker thread for PNG encoding + atomic write. */
     private fun flushSaveAsync() {
+        if (!contentLoaded) {
+            Log.i(TAG, "skip save — current canvas not yet loaded from disk")
+            return
+        }
         val idx = store.getCurrentIndex()
         val bmp = ink.peekDocBitmap() ?: return
         val snapshot: Bitmap = try {
