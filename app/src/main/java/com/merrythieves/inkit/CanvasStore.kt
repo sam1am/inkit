@@ -152,17 +152,18 @@ class CanvasStore(context: Context) {
         return blank
     }
 
-    fun saveBitmap(index: Int, bitmap: Bitmap) {
-        if (index !in items.indices) return
-        val meta = items[index]
-        val tmp = File(dir, "${meta.id}.png.tmp")
+    /** Save by canvas id (not index). The caller captures the id on the main
+     *  thread at snapshot time so a concurrent index mutation (delete/create)
+     *  can't redirect the write onto a different canvas's file. */
+    fun saveBitmap(id: String, bitmap: Bitmap) {
+        val tmp = File(dir, "$id.png.tmp")
         try {
             FileOutputStream(tmp).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             }
-            tmp.renameTo(File(dir, "${meta.id}.png"))
+            tmp.renameTo(File(dir, "$id.png"))
         } catch (t: Throwable) {
-            Log.w(TAG, "saveBitmap[$index] failed: ${t.message}")
+            Log.w(TAG, "saveBitmap[$id] failed: ${t.message}")
             tmp.delete()
         }
     }

@@ -220,10 +220,14 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Delete this canvas? This can't be undone.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Delete") { _, _ ->
+                // Drop any pending debounced save without flushing — we're
+                // about to delete this canvas, so saving its current state
+                // would just orphan a file.
+                ink.removeCallbacks(saveRunnable)
                 val idx = store.getCurrentIndex()
                 val newIdx = store.delete(idx)
                 if (newIdx < 0) {
-                    store.createNew(setCurrent = true)
+                    store.createNew(setCurrent = true, inheritBackgroundType = currentBackgroundIndex)
                 }
                 loadCurrentIntoView()
             }.show()
@@ -335,6 +339,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val idx = store.getCurrentIndex()
+        // Capture the canvas id on the main thread so the bg write can't be
+        // redirected onto a different canvas if the index is mutated (delete,
+        // createNew, page switch) before the worker thread picks the task up.
+        val id = store.getMeta(idx).id
         val bmp = ink.peekDocBitmap() ?: return
         val snapshot: Bitmap = try {
             bmp.copy(Bitmap.Config.ARGB_8888, false)
@@ -344,7 +352,7 @@ class MainActivity : AppCompatActivity() {
         }
         saveExecutor.execute {
             try {
-                store.saveBitmap(idx, snapshot)
+                store.saveBitmap(id, snapshot)
             } finally {
                 snapshot.recycle()
             }
