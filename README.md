@@ -25,6 +25,12 @@ inkit aims to stay out of your way:
 - **Touch-through buttons** — control buttons remain tappable even when finger touch is disabled on the canvas.
 - **Multi-page canvas** — flip between pages for journaling-style workflows.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/assets/inkit-screen.png" alt="inkit app screenshot" width="400">
+</p>
+
 ## Building
 
 ### Prerequisites
