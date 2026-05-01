@@ -11,8 +11,8 @@ android {
         applicationId = "com.merrythieves.inkit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10004
-        versionName = "1.0.4"
+        versionCode = 10005
+        versionName = "1.0.5"
     }
 
     buildFeatures {
