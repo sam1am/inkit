@@ -382,6 +382,11 @@ class InkSurfaceView @JvmOverloads constructor(
                 fallbackPenDown = true
                 fallbackPenLastX = event.x
                 fallbackPenLastY = event.y + scrollY
+                // Tap / short-flick visibility: drawLine alone never fires for a
+                // DOWN-then-UP, so a tap would leave nothing. Paint a dot now.
+                Canvas(doc).drawPoint(fallbackPenLastX, fallbackPenLastY, paint)
+                rebuildWindowFromDoc()
+                commitWindowToSurface()
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!fallbackPenDown) return false
@@ -411,9 +416,16 @@ class InkSurfaceView @JvmOverloads constructor(
      *  Coords arrive view-local; translate by [scrollY] to document-local. */
     private fun replayStrokeIntoDocument() {
         val doc = docBitmap ?: return
-        if (strokeBuffer.size < 2) return
+        if (strokeBuffer.isEmpty()) return
         val canvas = Canvas(doc)
         val paint = if (isEraser) eraserPaint else strokePaint
+        // Always paint a dot at the down point: a tap produces a buffer of two
+        // near-identical points, and drawLine on a degenerate segment is not
+        // guaranteed to render. The daemon paints a matching dot on its EPD
+        // overlay; mirror that into the persisted document so the bullet
+        // survives a save/load round-trip.
+        val first = strokeBuffer[0]
+        canvas.drawPoint(first.x, first.y + scrollY, paint)
         for (i in 1 until strokeBuffer.size) {
             val a = strokeBuffer[i - 1]
             val b = strokeBuffer[i]

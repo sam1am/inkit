@@ -80,6 +80,14 @@ class BigmeInkController : InkController {
         attaching = true
         return try {
             val cls = Class.forName(HANDWRITTEN_CLIENT)
+            // Resolve hot-path methods once so the binder-thread input handler
+            // doesn't pay for a Class.getMethod() lookup on the first stroke
+            // (subsequent calls hit ART's reflection cache, but the first does
+            // a name+signature scan that's perceptible at the head of a tap).
+            val getCanvasMethod = cls.getMethod("getCanvas")
+            val inValidateMethod = cls.getMethod(
+                "inValidate", Rect::class.java, Int::class.javaPrimitiveType
+            )
             val c = cls.getConstructor(android.content.Context::class.java).newInstance(view.context)
 
             cls.getMethod("bindView", android.view.View::class.java).invoke(c, view)
@@ -92,7 +100,8 @@ class BigmeInkController : InkController {
                     callback,
                     view,
                     getClient = { client },
-                    getClientClass = { clientClass },
+                    getCanvasMethod = getCanvasMethod,
+                    inValidateMethod = inValidateMethod,
                     getStrokeWidth = { pendingWidth },
                     getStrokeColor = { pendingColor },
                     strokeIndex = strokeIndex,
@@ -383,7 +392,8 @@ class BigmeInkController : InkController {
         private val sink: StrokeCallback,
         view: SurfaceView,
         private val getClient: () -> Any?,
-        private val getClientClass: () -> Class<*>?,
+        private val getCanvasMethod: Method,
+        private val inValidateMethod: Method,
         private val getStrokeWidth: () -> Float,
         private val getStrokeColor: () -> Int,
         private val strokeIndex: java.util.concurrent.atomic.AtomicInteger,
@@ -468,11 +478,10 @@ class BigmeInkController : InkController {
                 // dispatcher calls HandwrittenClient.convertXY internally
                 // before invoking the InputListener (unless mUseRawInputEvent
                 // is true, which we never set). Double-conversion was the bug.
-                val cls = getClientClass()
                 val client = getClient()
-                if (cls != null && client != null) {
+                if (client != null) {
                     try {
-                        val canvas = cls.getMethod("getCanvas").invoke(client) as? android.graphics.Canvas
+                        val canvas = getCanvasMethod.invoke(client) as? android.graphics.Canvas
                         if (action == ACTION_DOWN) {
                             android.util.Log.i(TAG, "DOWN: canvas=$canvas view=($x,$y)")
                         }
@@ -507,6 +516,19 @@ class BigmeInkController : InkController {
                                     }
                                     paint.strokeWidth = getStrokeWidth()
                                     paint.color = getStrokeColor()
+                                    // Paint a dot at the down point and refresh
+                                    // immediately. Without this, the daemon paints
+                                    // nothing until the first ACTION_MOVE — taps and
+                                    // short bullet-point flicks leave no mark, and
+                                    // the start of every stroke is invisible until a
+                                    // MOVE event arrives ~8–16 ms later.
+                                    canvas.drawPoint(x, y, paint)
+                                    val dotPad = paint.strokeWidth.toInt() + 2
+                                    val dotRect = Rect(
+                                        x.toInt() - dotPad, y.toInt() - dotPad,
+                                        x.toInt() + dotPad, y.toInt() + dotPad,
+                                    )
+                                    inValidateMethod.invoke(client, dotRect, MODE_HANDWRITE)
                                 }
                                 ACTION_MOVE -> {
                                     if (firstMoveOfStroke) firstMoveArrivalNs = System.nanoTime()
@@ -527,8 +549,7 @@ class BigmeInkController : InkController {
                                         val wasFirst = firstMoveOfStroke
                                         firstMoveOfStroke = false
                                         val invStart = System.nanoTime()
-                                        cls.getMethod("inValidate", android.graphics.Rect::class.java, Int::class.javaPrimitiveType)
-                                            .invoke(client, accumDirty, MODE_HANDWRITE)
+                                        inValidateMethod.invoke(client, accumDirty, MODE_HANDWRITE)
                                         val invEnd = System.nanoTime()
                                         PerfCounters.recordDirect(
                                             PerfMetric.PAINT_INVALIDATE_CALL,
@@ -602,8 +623,7 @@ class BigmeInkController : InkController {
                                     // Flush pending partial-refresh segment.
                                     if (accumDirty.left != Int.MAX_VALUE) {
                                         val invStart = System.nanoTime()
-                                        cls.getMethod("inValidate", android.graphics.Rect::class.java, Int::class.javaPrimitiveType)
-                                            .invoke(client, accumDirty, MODE_HANDWRITE)
+                                        inValidateMethod.invoke(client, accumDirty, MODE_HANDWRITE)
                                         PerfCounters.recordDirect(
                                             PerfMetric.PAINT_INVALIDATE_CALL,
                                             System.nanoTime() - invStart,
