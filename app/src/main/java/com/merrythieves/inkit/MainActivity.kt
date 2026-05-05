@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnColor: ImageButton
     private lateinit var btnFinger: ImageButton
     private lateinit var btnNew: ImageButton
+    private lateinit var btnUndo: ImageButton
     private lateinit var btnMore: ImageButton
     private lateinit var btnBackground: ImageButton
     private lateinit var palette: LinearLayout
@@ -92,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         btnColor = findViewById(R.id.btnColor)
         btnFinger = findViewById(R.id.btnFinger)
         btnNew = findViewById(R.id.btnNew)
+        btnUndo = findViewById(R.id.btnUndo)
         btnMore = findViewById(R.id.btnMore)
         btnBackground = findViewById(R.id.btnBackground)
         palette = findViewById(R.id.colorPalette)
@@ -115,6 +117,9 @@ class MainActivity : AppCompatActivity() {
             store.createNew(setCurrent = true, inheritBackgroundType = currentBackgroundIndex)
             loadCurrentIntoView()
         }
+        btnUndo.setOnClickListener {
+            if (ink.undo()) updateUndoButton()
+        }
         btnBackground.setOnClickListener { showBackgroundPicker() }
 
         ink.setPageNavListener { dir ->
@@ -128,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         }
         ink.setScrollListener { y, max -> updateScrollIndicator(y, max) }
         ink.setDirtyListener { schedulePersist() }
+        ink.setUndoListener { updateUndoButton() }
         // If the surface is destroyed and recreated (e.g. brief backgrounding,
         // config change), reload from disk in case the in-memory bitmap was
         // lost. With InkSurfaceView's bitmaps now retained across the surface
@@ -139,6 +145,7 @@ class MainActivity : AppCompatActivity() {
         buildPalette()
         updateToolHighlights()
         updatePageLabel()
+        updateUndoButton()
 
         // Defer the first canvas load until the surface has dimensions, so
         // the document bitmap is sized correctly for vertical scroll.
@@ -191,7 +198,14 @@ class MainActivity : AppCompatActivity() {
         updateToolHighlights()
         updatePageLabel()
         updateScrollIndicator(0, ink.maxScrollY())
+        updateUndoButton()
         contentLoaded = true
+    }
+
+    private fun updateUndoButton() {
+        val enabled = ink.canUndo()
+        btnUndo.isEnabled = enabled
+        btnUndo.alpha = if (enabled) 1.0f else 0.35f
     }
 
     private fun showMoreMenu() {
@@ -377,6 +391,7 @@ class MainActivity : AppCompatActivity() {
         // createNew, page switch) before the worker thread picks the task up.
         val id = store.getMeta(idx).id
         val bmp = ink.peekDocBitmap() ?: return
+        Log.i(TAG, "flushSaveAsync: id=$id docId=${System.identityHashCode(bmp)}")
         val snapshot: Bitmap = try {
             bmp.copy(Bitmap.Config.ARGB_8888, false)
         } catch (t: Throwable) {
@@ -386,6 +401,7 @@ class MainActivity : AppCompatActivity() {
         saveExecutor.execute {
             try {
                 store.saveBitmap(id, snapshot)
+                Log.i(TAG, "flushSaveAsync: wrote $id to disk")
             } finally {
                 snapshot.recycle()
             }

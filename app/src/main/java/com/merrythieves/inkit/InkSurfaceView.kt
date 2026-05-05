@@ -107,6 +107,15 @@ class InkSurfaceView @JvmOverloads constructor(
     // Daemon stroke buffer (view-local coords from the InputListener).
     private val strokeBuffer = mutableListOf<PointF>()
 
+    /** Snapshots of [docBitmap] captured just before each new stroke begins,
+     *  oldest first. Cap at [maxUndoLevels]; pushing past the cap recycles
+     *  and drops the oldest entry. */
+    private val undoStack: ArrayDeque<Bitmap> = ArrayDeque()
+    private val maxUndoLevels = 10
+    private var undoListener: (() -> Unit)? = null
+    fun setUndoListener(l: (() -> Unit)?) { undoListener = l }
+    fun canUndo(): Boolean = undoStack.isNotEmpty()
+
     // Finger-gesture state.
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val swipeThreshold = (touchSlop * 8).coerceAtLeast(120)
@@ -125,16 +134,41 @@ class InkSurfaceView @JvmOverloads constructor(
 
     init { holder.addCallback(this) }
 
+    /** True when the current daemon stroke began outside the view bounds —
+     *  the daemon picks up finger taps anywhere on the screen, including the
+     *  toolbar above this view, and reports them at negative-y view-local
+     *  coordinates. We swallow such strokes so they neither pollute the doc
+     *  nor the undo stack. */
+    private var droppingStroke = false
+
     private val strokeCallback = object : StrokeCallback {
         override fun onStrokeBegin(x: Float, y: Float, pressure: Float, timestampMs: Long) {
+            // Drop strokes whose down-point is outside the view (toolbar taps,
+            // status-bar drags, etc.). View height isn't ready before layout —
+            // bail conservatively in that case too.
+            val h = height
+            if (h <= 0 || x < 0f || y < 0f || x > width || y > h) {
+                Log.i(TAG, "cb.begin ($x,$y) — out of bounds, dropping stroke")
+                droppingStroke = true
+                strokeBuffer.clear()
+                return
+            }
+            droppingStroke = false
             Log.i(TAG, "cb.begin ($x,$y)")
+            pushUndoSnapshot()
             strokeBuffer.clear()
             strokeBuffer.add(PointF(x, y))
         }
         override fun onStrokeMove(x: Float, y: Float, pressure: Float, timestampMs: Long) {
+            if (droppingStroke) return
             strokeBuffer.add(PointF(x, y))
         }
         override fun onStrokeEnd(x: Float, y: Float, pressure: Float, timestampMs: Long) {
+            if (droppingStroke) {
+                droppingStroke = false
+                strokeBuffer.clear()
+                return
+            }
             strokeBuffer.add(PointF(x, y))
             val docDims = docBitmap?.let { "${it.width}x${it.height}" } ?: "null"
             Log.i(TAG, "cb.end buf=${strokeBuffer.size} doc=$docDims scrollY=$scrollY")
@@ -185,6 +219,7 @@ class InkSurfaceView @JvmOverloads constructor(
     /** Switch the underlying document to [bmp]. Caller owns lifecycle of any
      *  previous bitmap returned by [takeDocBitmap]. */
     fun setDocBitmap(bmp: Bitmap, scrollYReset: Int = 0) {
+        clearUndoStack()
         docBitmap?.recycle()
         docBitmap = bmp
         scrollY = scrollYReset.coerceIn(0, maxScrollY())
@@ -197,6 +232,7 @@ class InkSurfaceView @JvmOverloads constructor(
 
     /** Set document with saved content (ink-only, transparent background) and background type. */
     fun setDocBitmapWithContent(content: Bitmap, bgType: Int, scrollYReset: Int = 0) {
+        clearUndoStack()
         docBitmap?.recycle()
         // docBitmap holds ink strokes on a TRANSPARENT background.
         // Background patterns are composited in rebuildWindowFromDoc, not baked here.
@@ -265,11 +301,73 @@ class InkSurfaceView @JvmOverloads constructor(
         val doc = docBitmap ?: return
         // Clear to transparent so background pattern shows through
         Canvas(doc).drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+        clearUndoStack()
         rebuildWindowFromDoc()
         commitWindowToSurface()
         windowBitmap?.let { ink.syncOverlay(it, force = true) }
         ink.resetDiagnostics()
         dirtyListener?.invoke()
+    }
+
+    /** Snapshot the current doc bitmap for a future undo. Called right before
+     *  each stroke modifies [docBitmap]. Drops the oldest entry when the cap
+     *  is reached. No-op if the doc bitmap isn't ready. */
+    private fun pushUndoSnapshot() {
+        val doc = docBitmap ?: run {
+            Log.i(TAG, "pushUndoSnapshot: no docBitmap, skipping")
+            return
+        }
+        // Mutable: this bitmap will become the next docBitmap on undo, and a
+        // Canvas(doc) won't construct against an immutable bitmap.
+        val snap = try {
+            doc.copy(Bitmap.Config.ARGB_8888, true)
+        } catch (t: Throwable) {
+            Log.w(TAG, "undo snapshot failed: ${t.message}")
+            return
+        }
+        undoStack.addLast(snap)
+        while (undoStack.size > maxUndoLevels) {
+            undoStack.removeFirst().recycle()
+        }
+        Log.i(TAG, "pushUndoSnapshot: captured ${snap.width}x${snap.height}, stack=${undoStack.size}")
+        undoListener?.invoke()
+    }
+
+    /** Pop the most recent snapshot and restore it as the doc bitmap. Returns
+     *  false if there is nothing to undo. Fires the dirty listener so the
+     *  restored state is persisted to disk. */
+    fun undo(): Boolean {
+        Log.i(TAG, "undo: invoked, stack=${undoStack.size}, docId=${System.identityHashCode(docBitmap)}")
+        val snap = undoStack.removeLastOrNull() ?: run {
+            Log.i(TAG, "undo: stack empty, no-op")
+            return false
+        }
+        val current = docBitmap
+        // If dimensions changed (surface resize) since this snapshot was taken,
+        // discard it — restoring would corrupt the doc bitmap. Drop the rest of
+        // the stack too: every entry below it predates the resize.
+        if (current != null && (snap.width != current.width || snap.height != current.height)) {
+            Log.i(TAG, "undo: dimensions mismatch (snap=${snap.width}x${snap.height} doc=${current.width}x${current.height}), aborting")
+            snap.recycle()
+            clearUndoStack()
+            undoListener?.invoke()
+            return false
+        }
+        docBitmap?.recycle()
+        docBitmap = snap
+        rebuildWindowFromDoc()
+        commitWindowToSurface()
+        windowBitmap?.let { ink.syncOverlay(it, force = true) }
+        Log.i(TAG, "undo: applied, newDocId=${System.identityHashCode(snap)}, stack=${undoStack.size}")
+        dirtyListener?.invoke()
+        undoListener?.invoke()
+        return true
+    }
+
+    private fun clearUndoStack() {
+        for (b in undoStack) b.recycle()
+        undoStack.clear()
+        undoListener?.invoke()
     }
 
     fun maxScrollY(): Int = (docHeight() - height).coerceAtLeast(0)
@@ -322,6 +420,7 @@ class InkSurfaceView @JvmOverloads constructor(
                             kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f -> FingerMode.SCROLL
                             else -> FingerMode.DRAW
                         }
+                        if (fingerMode == FingerMode.DRAW) pushUndoSnapshot()
                     } else return true
                 }
                 when (fingerMode) {
@@ -380,6 +479,7 @@ class InkSurfaceView @JvmOverloads constructor(
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 fallbackPenDown = true
+                pushUndoSnapshot()
                 fallbackPenLastX = event.x
                 fallbackPenLastY = event.y + scrollY
                 // Tap / short-flick visibility: drawLine alone never fires for a

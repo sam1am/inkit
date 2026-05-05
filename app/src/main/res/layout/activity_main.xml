@@ -98,6 +98,14 @@
             android:layout_weight="1" />
 
         <ImageButton
+            android:id="@+id/btnUndo"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_undo"
+            android:contentDescription="Undo last stroke" />
+
+        <ImageButton
             android:id="@+id/btnNew"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="40dp"
