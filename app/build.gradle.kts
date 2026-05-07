@@ -11,8 +11,8 @@ android {
         applicationId = "com.merrythieves.inkit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10009
-        versionName = "1.0.9"
+        versionCode = 10010
+        versionName = "1.0.10"
     }
 
     // Release signing reads keystore path + credentials from env vars (CI) or
