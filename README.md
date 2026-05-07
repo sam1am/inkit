@@ -4,7 +4,7 @@
 
 # inkit
 
-A simple, fast note-taking app for Android with an eye toward bullet journaling. inkit is designed to be used with [Bigme](https://bigme.vn/) e-ink devices and built on top of [inksdk](https://github.com/imedwei/inksdk) for low-latency stylus input.
+A simple, fast note-taking app for Android with an eye toward bullet journaling. inkit is designed to be used with [Bigme](https://bigme.vn/) and [Boox](https://shop.boox.com/) e-ink devices, and built on top of [inksdk](https://github.com/imedwei/inksdk) for low-latency stylus input. The active controller is auto-detected at startup — Bigme firmware uses the `HandwrittenClient` daemon, Boox firmware uses Onyx's `TouchHelper`, and other Android devices fall back to the standard `MotionEvent` + `Canvas` path.
 
 Special thanks to [imedwei/inksdk](https://github.com/imedwei/inksdk) for the underlying low-latency ink library that makes this possible.
 
@@ -15,7 +15,7 @@ inkit aims to stay out of your way:
 - **Simple** — pen, eraser, page nav. Nothing else to learn.
 - **Fast** — low-latency stylus input via inksdk's vendor-specific ink controllers.
 - **Bullet-journal friendly** — quick page creation and navigation for daily logs, collections, and rapid logging.
-- **E-ink first** — designed and tuned for Bigme devices, with fallback support for other Android tablets.
+- **E-ink first** — designed and tuned for Bigme and Boox devices, with fallback support for other Android tablets.
 
 ## Features
 
@@ -123,9 +123,10 @@ private fun isFingerInput(event: MotionEvent): Boolean {
 ## Architecture Notes
 
 - Uses the `InkController` interface for vendor abstraction.
-- Supports Bigme (via `HandwrittenClient`), Onyx (via `TouchHelper`), and a fallback (standard `MotionEvent` path).
+- Supports Bigme (via `HandwrittenClient`), Boox / Onyx (via `TouchHelper`), and a fallback (standard `MotionEvent` path).
+- Controller selection is automatic: `InkControllerFactory` picks Bigme when `Build.MANUFACTURER == "Bigme"`, otherwise instantiates the Onyx controller — whose `attach()` succeeds on Boox firmware and fails cleanly elsewhere, dropping the host onto the `MotionEvent` fallback. No user-facing toggle is required.
 - Ink is mirrored to a bitmap for compatibility with system UI composes.
-- Onyx `TouchHelper` owns the surface during raw drawing; Bigme paints to a separate ION buffer.
+- Onyx `TouchHelper` owns the surface during raw drawing; the host suspends the controller around `holder.lockCanvas()` calls to avoid surface-lock deadlocks. Bigme paints to a separate ION buffer and needs no such suspension.
 
 ## Acknowledgements
 

@@ -50,6 +50,13 @@ android {
         viewBinding = true
     }
 
+    packaging {
+        // Onyx pen SDK (onyxsdk-pen) and mmkv (transitive of onyxsdk-base)
+        // both ship the same arm64-v8a libc++_shared.so. Pick one — without
+        // this the final APK merge fails with a duplicate-files error.
+        jniLibs { pickFirsts += "**/libc++_shared.so" }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

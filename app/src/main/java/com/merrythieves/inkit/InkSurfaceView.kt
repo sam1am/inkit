@@ -658,9 +658,20 @@ class InkSurfaceView @JvmOverloads constructor(
     private fun commitWindowToSurface() {
         if (!surfaceReady) return
         val window = windowBitmap ?: return
-        val canvas = holder.lockCanvas() ?: return
-        try { canvas.drawBitmap(window, 0f, 0f, null) }
-        finally { holder.unlockCanvasAndPost(canvas) }
+        // Onyx's TouchHelper holds the SurfaceView's lock while raw drawing
+        // is active — calling holder.lockCanvas() would block forever. Pause
+        // the controller around the commit (a no-op on Bigme/Noop where
+        // ownsSurface is false). The Onyx SDK handles rapid disable/enable
+        // cycles fine; this is the same pattern used in syncOverlay(force).
+        val needSuspend = ink.ownsSurface && ink.isActive
+        if (needSuspend) ink.setEnabled(false)
+        try {
+            val canvas = holder.lockCanvas() ?: return
+            try { canvas.drawBitmap(window, 0f, 0f, null) }
+            finally { holder.unlockCanvasAndPost(canvas) }
+        } finally {
+            if (needSuspend) ink.setEnabled(true)
+        }
     }
 
     fun isOverlayActive(): Boolean = ink.isActive
