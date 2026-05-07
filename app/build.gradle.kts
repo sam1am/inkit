@@ -15,18 +15,22 @@ android {
         versionName = "1.0.9"
     }
 
-    // Release signing reads the keystore path + credentials from env vars so
-    // CI can supply them via secrets without checking the keystore into git.
-    // Local debug builds work even when these aren't set — assembleRelease is
-    // the only target that needs them.
+    // Release signing reads keystore path + credentials from env vars (CI) or
+    // gradle properties (local dev — put them in ~/.gradle/gradle.properties,
+    // which lives outside the repo and is never committed). Env vars win if
+    // both are set. Local debug builds work without any of this — assembleRelease
+    // is the only target that needs it.
+    fun creds(name: String): String? =
+        System.getenv(name) ?: (findProperty(name) as String?)
+
     signingConfigs {
         create("release") {
-            val storePath = System.getenv("KEYSTORE_PATH")
+            val storePath = creds("KEYSTORE_PATH")
             if (!storePath.isNullOrBlank()) {
                 storeFile = file(storePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = creds("KEYSTORE_PASSWORD")
+                keyAlias = creds("KEY_ALIAS")
+                keyPassword = creds("KEY_PASSWORD")
             }
         }
     }
@@ -35,7 +39,7 @@ android {
         getByName("release") {
             // Only attach the release signing config if a keystore is actually
             // configured; otherwise the AGP build fails before any task runs.
-            if (!System.getenv("KEYSTORE_PATH").isNullOrBlank()) {
+            if (!creds("KEYSTORE_PATH").isNullOrBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = false
