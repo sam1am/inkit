@@ -39,9 +39,17 @@ out/
 *.bak
 *.swp
 
-# Keystore files
+# Keystore / credential files
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+.env
+.env.*
+*.secrets
+keystore.properties
+signing.properties
 
 # NDK
 obj/

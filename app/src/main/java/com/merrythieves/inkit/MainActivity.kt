@@ -1,9 +1,11 @@
 package com.merrythieves.inkit
 
 import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -11,8 +13,14 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.inksdk.ink.InkDefaults
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
@@ -77,9 +85,27 @@ class MainActivity : AppCompatActivity() {
     }
     private val saveRunnable = Runnable { flushSaveAsync() }
 
+    private lateinit var exportLauncher: ActivityResultLauncher<Intent>
+    private lateinit var importLauncher: ActivityResultLauncher<Intent>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        exportLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            popPenDisable()
+            val uri = result.data?.data
+            if (result.resultCode == RESULT_OK && uri != null) handleExport(uri)
+        }
+        importLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            popPenDisable()
+            val uri = result.data?.data
+            if (result.resultCode == RESULT_OK && uri != null) handleImport(uri)
+        }
 
         store = CanvasStore(this)
         store.ensureNonEmpty()
@@ -212,16 +238,74 @@ class MainActivity : AppCompatActivity() {
         val popup = PopupMenu(this, btnMore)
         popup.menu.add(0, 1, 0, "Clear canvas")
         popup.menu.add(0, 2, 1, "Delete canvas")
+        popup.menu.add(0, 3, 2, "Export notes…")
+        popup.menu.add(0, 4, 3, "Import notes…")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> confirmClear()
                 2 -> confirmDelete()
+                3 -> startExport()
+                4 -> confirmImport()
             }
             true
         }
         popup.setOnDismissListener { popPenDisable() }
         pushPenDisable()
         popup.show()
+    }
+
+    private fun startExport() {
+        cancelSaveAndFlush()
+        val ts = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/zip"
+            putExtra(Intent.EXTRA_TITLE, "inkit-notes-$ts.zip")
+        }
+        pushPenDisable()
+        exportLauncher.launch(intent)
+    }
+
+    private fun confirmImport() {
+        pushPenDisable()
+        AlertDialog.Builder(this)
+            .setTitle("Import notes")
+            .setMessage("Importing will REPLACE all current canvases with the contents of the archive. Continue?")
+            .setNegativeButton("Cancel") { _, _ -> popPenDisable() }
+            .setPositiveButton("Choose file") { _, _ ->
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
+                }
+                importLauncher.launch(intent)
+            }
+            .setOnCancelListener { popPenDisable() }
+            .show()
+    }
+
+    private fun handleExport(dest: Uri) {
+        when (val r = NotesArchive.export(this, dest)) {
+            is NotesArchive.Result.Success ->
+                Toast.makeText(this, "Exported ${r.entries} files", Toast.LENGTH_SHORT).show()
+            is NotesArchive.Result.Failure ->
+                Toast.makeText(this, "Export failed: ${r.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun handleImport(src: Uri) {
+        cancelSaveAndFlush()
+        when (val r = NotesArchive.importArchive(this, src)) {
+            is NotesArchive.Result.Success -> {
+                store = CanvasStore(this)
+                store.ensureNonEmpty()
+                contentLoaded = false
+                loadCurrentIntoView()
+                Toast.makeText(this, "Imported ${r.entries} files", Toast.LENGTH_SHORT).show()
+            }
+            is NotesArchive.Result.Failure ->
+                Toast.makeText(this, "Import failed: ${r.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun confirmClear() {

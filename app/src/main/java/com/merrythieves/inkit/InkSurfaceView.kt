@@ -175,8 +175,10 @@ class InkSurfaceView @JvmOverloads constructor(
             replayStrokeIntoDocument()
             commitWindowToSurface()
             // Re-prime the daemon overlay so its ION buffer matches the new
-            // document state for the visible window. Soft sync (no force).
-            windowBitmap?.let { ink.syncOverlay(it, force = false) }
+            // document state. Eraser strokes need a forced refresh: the daemon
+            // painted white over the background pattern during the stroke and
+            // a SurfaceView commit alone won't cycle the EPD to clear it.
+            windowBitmap?.let { ink.syncOverlay(it, force = isEraser) }
             strokeBuffer.clear()
             dirtyListener?.invoke()
         }

@@ -15,6 +15,33 @@ android {
         versionName = "1.0.8"
     }
 
+    // Release signing reads the keystore path + credentials from env vars so
+    // CI can supply them via secrets without checking the keystore into git.
+    // Local debug builds work even when these aren't set — assembleRelease is
+    // the only target that needs them.
+    signingConfigs {
+        create("release") {
+            val storePath = System.getenv("KEYSTORE_PATH")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            // Only attach the release signing config if a keystore is actually
+            // configured; otherwise the AGP build fails before any task runs.
+            if (!System.getenv("KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            isMinifyEnabled = false
+        }
+    }
+
     buildFeatures {
         viewBinding = true
     }

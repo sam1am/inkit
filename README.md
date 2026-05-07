@@ -52,6 +52,23 @@ export ANDROID_HOME=/path/to/android-sdk
 
 The APK will be at: `app/build/outputs/apk/debug/app-debug.apk`
 
+## Migrating from a pre-1.0.8 build (preserve your notes)
+
+Releases before 1.0.8 were unsigned debug builds with a per-CI-run keystore. Starting with 1.0.8 the release APK is signed with a permanent key, so future updates apply in place — but the *first* upgrade can't run on top of an older install because the signing certificates differ.
+
+To carry your notes across the transition:
+
+1. **Install the matching debug APK** — every GitHub release now ships both `app-release.apk` and `app-debug.apk`. Install the debug build over your current install (or build locally with `./gradlew assembleDebug` and `adb install -r app/build/outputs/apk/debug/app-debug.apk`). Debug builds remain compatible with previously-installed debug builds when the same debug keystore is used. If your existing install was built locally on this machine, the local debug APK will install over it; if it came from CI, see "Stable debug keystore" below.
+2. **Export your notes** — open the app, tap the **More** menu, choose **Export notes…**, and save the zip somewhere outside the app sandbox (e.g. `Downloads`).
+3. **Uninstall and install the release** — uninstall the old app, install `app-release.apk` via Obtainium (or sideload).
+4. **Import** — open the new release build, **More → Import notes…**, pick the zip you exported.
+
+From this point on, every `app-release.apk` from CI is signed with the same key, so Obtainium updates apply cleanly without ever asking to uninstall.
+
+### Stable debug keystore (optional)
+
+If you want CI debug builds to be update-compatible with each other, base64-encode your `~/.android/debug.keystore` and add it as a `DEBUG_KEYSTORE_BASE64` repo secret. The workflow places it at `~/.android/debug.keystore` on the runner before `assembleDebug`. Without this secret, each CI debug APK is signed with a fresh random keystore and won't install over a previous CI debug build.
+
 ## Usage
 
 1. **Draw with stylus** — always works (pen input bypasses the finger touch toggle).
